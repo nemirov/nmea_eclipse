@@ -260,7 +260,7 @@ string itoa(int value, int base) {
 int NmeaParser::checkCrc(string *message) {
 	string separator_value = ",";
 
-	int length_sentence = gps_split_param(*message, nmeaArray, &separator_value);
+
 
 	//int length_end_message = gps_split_param(
 	//		&(nmeaArray->at(nmeaArray->size() - 1)), tmp_arr, &separator_crc);
@@ -279,14 +279,11 @@ int NmeaParser::checkCrc(string *message) {
 	string crc = message->substr(i+1, i+2);
 	transform(crc.begin(), crc.end(), crc.begin(), ::tolower);
 
-	if (crc ==itoa(calc_crc, 16)){
+	if (crc != itoa(calc_crc, 16)){
 		return -1;
 	}
 
-
-
-
-
+    int length_sentence = gps_split_param(*message, nmeaArray, &separator_value);
 
 
 	return 0;
