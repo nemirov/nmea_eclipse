@@ -30,6 +30,8 @@ using namespace std;
 
 NmeaParser::NmeaParser() {
 	nmeaArray = new vector<string>;
+	//default system is GPS
+	nmeaINFO = &nmeaINFOAll[NMEA_NAV_SYSTEM_GPS];
 }
 
 NmeaParser::~NmeaParser() {
@@ -46,8 +48,8 @@ void NmeaParser::Parse(string *nmeaString) {
 
 	if (checkCrc(nmeaString) != -1) {
 
-		if (nmeaArray->at(0).size() != 5) {
-			//Not $GXxxx
+		if (nmeaArray->at(0).size() != 5
+				|| setNavSystem(nmeaArray->at(0)) == -1) {
 			return;
 		}
 
@@ -88,39 +90,24 @@ void NmeaParser::Parse(string *nmeaString) {
 }
 
 /*
- XXGGA Sentence format
+ Format
 
- $GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M, ,*47
- |   |	  |			 |			 | |  |	  |		  |      | |
- |   |	  |			 |			 | |  |	  |		  |		 | checksum data
- |   |	  |			 |			 | |  |	  |		  |		 |
- |   |	  |			 |			 | |  |	  |		  |		 empty field
- |   |	  |			 |			 | |  |	  |		  |
- |   |	  |			 |			 | |  |	  |		  46.9,M Height of geoid (m) above WGS84 ellipsoid
- |   |	  |			 |			 | |  |	  |
- |   |	  |			 |			 | |  |	  545.4,M Altitude (m) above mean sea level
- |   |	  |			 |			 | |  |
- |   |	  |			 |			 | |  0.9 Horizontal dilution of position (HDOP)
- |   |	  |			 |			 | |
- |   |	  |			 |			 | 08 Number of satellites being tracked
- |   |	  |			 |			 |
- |   |	  |			 |			 1 Fix quality:	0 = invalid
- |   |	  |			 |							1 = GPS fix (SPS)
- |   |	  |			 |							2 = DGPS fix
- |   |	  |			 |							3 = PPS fix
- |   |	  |			 |							4 = Real Time Kinematic
- |   |	  |			 |							5 = Float RTK
- |   |	  |			 |							6 = estimated (dead reckoning) (2.3 feature)
- |   |	  |			 |							7 = Manual input mode
- |   |	  |			 |							8 = Simulation mode
- |   |	  |			 |
- |   |	  |			 01131.000,E Longitude 11 deg 31.000' E
- |   |	  |
- |   |	  4807.038,N Latitude 48 deg 07.038' N
- |   |
- |   123519 Fix taken at 12:35:19 UTC
- |
- GGA Global Positioning System Fix Data
+ eg2. $GPGGA,hhmmss.ss,ddmm.mmm,a,dddmm.mmm,b,q,xx,p.p,a.b,M,c.d,M,x.x,nnnn
+
+ hhmmss.ss = UTC of position
+ ddmm.mmm = latitude of position
+ a = N or S, latitutde hemisphere
+ dddmm.mmm = longitude of position
+ b = E or W, longitude hemisphere
+ q = GPS Quality indicator (0=No fix, 1=Non-differential GPS fix, 2=Differential GPS fix, 6=Estimated fix)
+ xx = number of satellites in use
+ p.p = horizontal dilution of precision
+ a.b = Antenna altitude above mean-sea-level
+ M = units of antenna altitude, meters
+ c.d = Geoidal height
+ M = units of geoidal height, meters
+ x.x = Age of Differential GPS data (seconds since last valid RTCM transmission)
+ nnnn = Differential reference station ID, 0000 to 1023
 
  */
 void NmeaParser::GGA2Info() {
@@ -157,24 +144,18 @@ void NmeaParser::GGA2Info() {
 	setHeightOfGeode(nmeaArray->at(11));
 	setHeightMeter(nmeaArray->at(12));
 
-}
+	//Age of Differential GPS data (seconds since last valid RTCM transmission)*/
+	setAgeGps(nmeaArray->at(13));
 
-void NmeaParser::ProcessGPGSA(const char *buf, const unsigned int bufSize) {
-
-}
-
-void NmeaParser::ProcessGPGSV(const char *buf, const unsigned int bufSize) {
-
-}
-
-void NmeaParser::ProcessGPRMB(const char *buf, const unsigned int bufSize) {
+	//Differential reference station ID, 0000 to 1023*/
+	setRefStation(nmeaArray->at(14));
 
 }
 
 /*
  Format
 
- eg4. for NMEA 0183 version 3.00 active the Mode indicator field is added
+ for NMEA 0183 version 3.00 active the Mode indicator field is added
  $GPRMC,hhmmss.ss,A,llll.ll,a,yyyyy.yy,a,x.x,x.x,ddmmyy,x.x,a,m*hh
  Field #
  1    = UTC time of fix
@@ -222,7 +203,30 @@ void NmeaParser::RMC2Info() {
 		//Magnetic variation
 		setDeclination(nmeaArray->at(10));
 
-	};
+		//E or W of magnetic variation
+		setMagneticVariation(nmeaArray->at(11));
+
+		//if NMEA 0183 version >= 3.00
+		if(nmeaArray->size() == 13){
+			//Mode indicator, (A=Autonomous, D=Differential, E=Estimated, N=Data not valid)
+			setFixRMC(nmeaArray->at(13));
+		};
+
+	} else {
+		return;
+	}
+}
+
+void NmeaParser::ProcessGPGSA(const char *buf, const unsigned int bufSize) {
+
+}
+
+void NmeaParser::ProcessGPGSV(const char *buf, const unsigned int bufSize) {
+
+}
+
+void NmeaParser::ProcessGPRMB(const char *buf, const unsigned int bufSize) {
+
 }
 
 void NmeaParser::ProcessGPZDA(const char *buf, const unsigned int bufSize) {
@@ -234,39 +238,38 @@ void NmeaParser::ProcessGPZDA(const char *buf, const unsigned int bufSize) {
  */
 string itoa(int value, int base) {
 
-		string buf;
+	string buf;
 
-		// check that the base if valid
-		if (base < 2 || base > 16) return buf;
-
-		enum { kMaxDigits = 35 };
-		buf.reserve( kMaxDigits ); // Pre-allocate enough space.
-
-		int quotient = value;
-
-		// Translating number to string with base:
-		do {
-			buf += "0123456789abcdef"[ abs( quotient % base ) ];
-			quotient /= base;
-		} while ( quotient );
-
-		// Append the negative sign
-		if ( value < 0) buf += '-';
-
-		reverse( buf.begin(), buf.end() );
+	// check that the base if valid
+	if (base < 2 || base > 16)
 		return buf;
-	}
+
+	enum {
+		kMaxDigits = 35
+	};
+	buf.reserve(kMaxDigits); // Pre-allocate enough space.
+
+	int quotient = value;
+
+	// Translating number to string with base:
+	do {
+		buf += "0123456789abcdef"[abs(quotient % base)];
+		quotient /= base;
+	} while (quotient);
+
+	// Append the negative sign
+	if (value < 0)
+		buf += '-';
+
+	reverse(buf.begin(), buf.end());
+	return buf;
+}
 
 int NmeaParser::checkCrc(string *message) {
 	string separator_value = ",";
 
-
-
-	//int length_end_message = gps_split_param(
-	//		&(nmeaArray->at(nmeaArray->size() - 1)), tmp_arr, &separator_crc);
-
-	unsigned int i =0;
-	int  calc_crc = 0;
+	unsigned int i = 0;
+	int calc_crc = 0;
 
 	while (message->at(i) != '*') {
 		if (i == message->size()) {
@@ -276,49 +279,54 @@ int NmeaParser::checkCrc(string *message) {
 		i++;
 	}
 
-	string crc = message->substr(i+1, i+2);
+	string crc = message->substr(i + 1, i + 2);
 	transform(crc.begin(), crc.end(), crc.begin(), ::tolower);
 
-	if (crc != itoa(calc_crc, 16)){
+	if (crc != itoa(calc_crc, 16)) {
 		return -1;
 	}
 
-    int length_sentence = gps_split_param(*message, nmeaArray, &separator_value);
-
+	*message = message->substr(0, i);
+	if (gps_split_param(*message, nmeaArray, &separator_value) == -1) {
+		return -1;
+	}
 
 	return 0;
 
 }
-void NmeaParser::setNavSystem(string system) {
+int NmeaParser::setNavSystem(string system) {
 
 	string nav_system = system.substr(0, 2);
 
 	if (nav_system == string("GP")) {
-		nmeaINFO.nav_system = NMEA_NAV_SYSTEM_GPS;
+		nmeaINFO = &nmeaINFOAll[NMEA_NAV_SYSTEM_GPS];
+		nmeaINFO->nav_system = NMEA_NAV_SYSTEM_GPS;
 	} else if (nav_system == string("GL")) {
-		nmeaINFO.nav_system = NMEA_NAV_SYSTEM_GLONASS;
+		nmeaINFO = &nmeaINFOAll[NMEA_NAV_SYSTEM_GLONASS];
+		nmeaINFO->nav_system = NMEA_NAV_SYSTEM_GLONASS;
 	} else if (nav_system == string("GN")) {
-		nmeaINFO.nav_system = NMEA_NAV_SYSTEM_GPS_GLONASS;
+		nmeaINFO = &nmeaINFOAll[NMEA_NAV_SYSTEM_GPS_GLONASS];
+		nmeaINFO->nav_system = NMEA_NAV_SYSTEM_GPS_GLONASS;
 	} else {
-		nmeaINFO.nav_system = NMEA_NAV_SYSTEM_UNKNOWN;
+		return -1;
 	}
-
+	return 0;
 }
 
 void NmeaParser::setDate(string date) {
 	if (date.size() > 6) {
-		nmeaINFO.utc_day = atoi(date.substr(0, 2).c_str());
-		nmeaINFO.utc_mon = atoi(date.substr(2, 2).c_str());
-		nmeaINFO.utc_year = atoi(date.substr(4, 2).c_str());
+		nmeaINFO->utc_day = atoi(date.substr(0, 2).c_str());
+		nmeaINFO->utc_mon = atoi(date.substr(2, 2).c_str());
+		nmeaINFO->utc_year = atoi(date.substr(4, 2).c_str());
 	}
 }
 
 void NmeaParser::setTime(string time) {
 
 	if (time.size() > 6) {
-		nmeaINFO.utc_hour = atoi(time.substr(0, 2).c_str());
-		nmeaINFO.utc_min = atoi(time.substr(2, 2).c_str());
-		nmeaINFO.utc_sec = atoi(time.substr(4, 2).c_str());
+		nmeaINFO->utc_hour = atoi(time.substr(0, 2).c_str());
+		nmeaINFO->utc_min = atoi(time.substr(2, 2).c_str());
+		nmeaINFO->utc_sec = atoi(time.substr(4, 2).c_str());
 	}
 }
 
@@ -326,72 +334,100 @@ void NmeaParser::setLatitude(string latitude) {
 	string separator = ".";
 	vector<string> tmp_array;
 	if (gps_split_param(latitude, &tmp_array, &separator) != -1) {
-		nmeaINFO.lat_deg = atoi(tmp_array.at(0).substr(0, 2).c_str());
-		nmeaINFO.lat_min = atoi(tmp_array.at(0).substr(2, 2).c_str());
-		nmeaINFO.lat_sec = floor(
+		nmeaINFO->lat_deg = atoi(tmp_array.at(0).substr(0, 2).c_str());
+		nmeaINFO->lat_min = atoi(tmp_array.at(0).substr(2, 2).c_str());
+		nmeaINFO->lat_sec = floor(
 				atof((string("0.") + tmp_array.at(1)).c_str()) * 60 + 0.5);
 
 	};
 }
 
 void NmeaParser::setLatHemisphere(string hem) {
-	nmeaINFO.lat_hemisphere = hem;
+	nmeaINFO->lat_hemisphere = hem;
 }
 
 void NmeaParser::setLongitude(string longitude) {
 	string separator = ".";
 	vector<string> tmp_array;
 	if (gps_split_param(longitude, &tmp_array, &separator) != -1) {
-		nmeaINFO.lon_deg = atoi(tmp_array.at(0).substr(0, 3).c_str());
-		nmeaINFO.lon_min = atoi(tmp_array.at(0).substr(3, 2).c_str());
-		nmeaINFO.lon_sec = floor(
+		nmeaINFO->lon_deg = atoi(tmp_array.at(0).substr(0, 3).c_str());
+		nmeaINFO->lon_min = atoi(tmp_array.at(0).substr(3, 2).c_str());
+		nmeaINFO->lon_sec = floor(
 				atof((string("0.") + tmp_array.at(1)).c_str()) * 60 + 0.5);
 
 	};
 }
 
 void NmeaParser::setLonHemisphere(string hem) {
-	nmeaINFO.lon_hemisphere = hem;
+	nmeaINFO->lon_hemisphere = hem;
 }
 
 void NmeaParser::setFix(string fix) {
-	nmeaINFO.fix = atoi(fix.c_str());
+	nmeaINFO->fix = atoi(fix.c_str());
 }
 
+void NmeaParser::setFixRMC(string mode){
+	if(mode == string("A")){
+		nmeaINFO->fix = 1; //GPS fix (SPS)
+	} else if (mode == string("D")){
+		nmeaINFO->fix = 2;//DGPS fix
+	} else if (mode == string("E")){
+		nmeaINFO->fix = 6;//estimated (dead reckoning)
+	} else {
+		nmeaINFO->fix = 0; //Invalid
+	};
+}
 void NmeaParser::setInview(string inview) {
-	nmeaINFO.inview = atoi(inview.c_str());
+	nmeaINFO->inview = atoi(inview.c_str());
 }
 
 void NmeaParser::setHDOP(string hdop) {
-	nmeaINFO.HDOP = atof(hdop.c_str());
+	nmeaINFO->HDOP = atof(hdop.c_str());
 }
 
 void NmeaParser::setElv(string elv) {
-	nmeaINFO.elv = atof(elv.c_str());
+	nmeaINFO->elv = atof(elv.c_str());
 }
 
 void NmeaParser::setElvMeter(string meter) {
-	nmeaINFO.elv_meter = meter;
+	nmeaINFO->elv_meter = meter;
 }
 
 void NmeaParser::setHeightOfGeode(string height) {
-	nmeaINFO.height_of_geode = atof(height.c_str());
+	nmeaINFO->height_of_geode = atof(height.c_str());
 }
 
 void NmeaParser::setHeightMeter(string meter) {
-	nmeaINFO.geode_meter = meter;
+	nmeaINFO->geode_meter = meter;
 }
 
+void NmeaParser::setAgeGps(string age){
+	if(age.size() > 0){
+		nmeaINFO->age_dgps = atoi(age.c_str());
+	}
+	nmeaINFO->age_dgps = 0;
+}
+
+void NmeaParser::setRefStation(string station){
+	if(station.size() > 0){
+			nmeaINFO->age_dgps = atoi(station.c_str());
+		}
+		nmeaINFO->age_dgps = 0;
+}
 void NmeaParser::setSpeed(string speed) {
-	nmeaINFO.speed = atof(speed.c_str()) * 1.852;
+	nmeaINFO->speed = atof(speed.c_str()) * 1.852;
 }
 
 void NmeaParser::setDirection(string direction) {
-	nmeaINFO.direction = atof(direction.c_str());
+	nmeaINFO->direction = atof(direction.c_str());
 }
 
 void NmeaParser::setDeclination(string decl) {
-	nmeaINFO.declination = atof(decl.c_str());
+	nmeaINFO->declination = atof(decl.c_str());
+}
+
+void NmeaParser::setMagneticVariation(string magnetic_var){
+	nmeaINFO->magnetic_variation = magnetic_var;
 }
 
 void NmeaParser::setPDOP(string pdop) {

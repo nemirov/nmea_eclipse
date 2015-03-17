@@ -19,6 +19,14 @@ public:
 	void Parse(string *nmeaString);
 	//GPSInfo & GetActualGPSInfo();
 
+	typedef struct _sat {
+		int id; /**< Satellite PRN number */
+				int in_use; /**< Used in position fix */
+				int elv_sat; /**< Elevation in degrees, 90 maximum */
+				int azimuth; /**< Azimuth, degrees from true north, 000 to 359 */
+				int sig_sat; /**< Signal, 00-99 dB */
+	} sat_t;
+
 	struct _nmeaINFO {
 
 		/**
@@ -26,7 +34,7 @@ public:
 		 * used also for generating NMEA stream
 		 * @GGA2info,  XXX...2info
 		 */
-		int smask; /**< Mask specifying types of packages from which data have been obtained */
+		//int smask; /**< Mask specifying types of packages from which data have been obtained */
 
 		int nav_system; /**< Navigation system from header NMEA message GP, GL, GN */
 
@@ -63,11 +71,13 @@ public:
 		double height_of_geode;/**Height of geoid above WGS84 ellipsoid*/
 		string geode_meter;/**meters Height*/
 
+		int age_dgps;/**Age of Differential GPS data (seconds since last valid RTCM transmission)*/
+		int reference_station;/**Differential reference station ID, 0000 to 1023*/
 
 		double speed; /**< Speed over the ground in kilometers/hour */
 		double direction; /**< Cource in degrees True */
 		double declination; /**< Magnetic variation degrees (Easterly var. subtracts from true course) */
-
+		string magnetic_variation; /**E or W of magnetic variation*/
 
 
 		double PDOP; /**< Position Dilution Of Precision */
@@ -80,33 +90,35 @@ public:
 		int inuse; /**< Number of satellites in use (not those in view) */
 
 
-		int id; /**< Satellite PRN number */
-		int in_use; /**< Used in position fix */
-		int elv_sat; /**< Elevation in degrees, 90 maximum */
-		int azimuth; /**< Azimuth, degrees from true north, 000 to 359 */
-		int sig_sat; /**< Signal, 00-99 dB */
+		sat_t sattelites[36];
 
-	} nmeaINFO;
+	} nmeaINFOAll[3];
 
 
 private:
 
+
+	struct _nmeaINFO *nmeaINFO;
+	vector<string> *nmeaArray;
+
 	void ParseRecursive(const char ch);
 
 	void GGA2Info();
+	void RMC2Info();
+
 	void ProcessGPGSA(const char *buf, const unsigned int bufSize);
 	void ProcessGPGSV(const char *buf, const unsigned int bufSize);
 	void ProcessGPRMB(const char *buf, const unsigned int bufSize);
-	void RMC2Info();
+
 	void ProcessGPZDA(const char *buf, const unsigned int bufSize);
 
 	//bool m_logging;
 	//GPSInfo m_GPSInfo;
 
-	vector<string> *nmeaArray;
+
 
 	int checkCrc(string *message);
-	void setNavSystem(string system);
+	int setNavSystem(string system);
 	void setDate(string date);
 	void setTime(string time);
 	void setLatitude(string latitude);
@@ -120,9 +132,14 @@ private:
 	void setElvMeter(string meter);
 	void setHeightOfGeode(string height);
 	void setHeightMeter(string meter);
+	void setAgeGps(string age);
+	void setRefStation(string station);
 	void setSpeed(string speed);
 	void setDirection(string direction);
 	void setDeclination(string decl);
+	void setMagneticVariation(string magnetic_var);
+	void setFixRMC(string mode);
+
 	void setPDOP(string pdop);
 	void setVDOP(string vdop);
 	//!!!!!!!!!!!!!!!!!!!!!!!!!!

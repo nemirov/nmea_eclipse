@@ -20,7 +20,7 @@
 #define	TYPE_STRING_LIST		4
 #define TYPE_IP					5
 
-
+#define MAX_SAT				36
 #define NMEA_SIG_BAD        (0)
 #define NMEA_SIG_LOW        (1)
 #define NMEA_SIG_MID        (2)
@@ -31,9 +31,9 @@
 #define NMEA_NAV_SYSTEM_GPS_GLONASS		(2)
 #define NMEA_NAV_SYSTEM_UNKNOWN			(3)
 
-#define NMEA_FIX_BAD        (1)
-#define NMEA_FIX_2D         (2)
-#define NMEA_FIX_3D         (3)
+#define NMEA_FIX_BAD        (0)
+#define NMEA_FIX_2D         (1)
+#define NMEA_FIX_3D         (2)
 
 #define NMEA_MAXSAT         (12)
 #define NMEA_SATINPACK      (4)

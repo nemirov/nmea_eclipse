@@ -14,7 +14,7 @@
 using namespace std;
 
 int main() {
-	string file = "/Users/c/Documents/workspace/nmea/Debug/nmea.test";
+	string file = "/Users/c/Documents/workspace/nmea_eclipse/Debug/nmea.test";
 	ifstream ifs (file.c_str());
 	char string_nmea[1024];
 
