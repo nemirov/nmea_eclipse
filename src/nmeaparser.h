@@ -45,6 +45,8 @@ public:
 		int utc_min; /**< Minutes after the hour - [0,59] */
 		int utc_sec; /**< Seconds after the minute - [0,59] */
 		int utc_hsec; /**< Hundredth part of second - [0,99] */
+		int local_zone_hours;/**local zone hours -13..13 */
+		int local_zone_min; /**local zone minutes 0..59*/
 
 		int fix; /**< GPS quality indicator (0 = Invalid; 1 = GPS fix (SPS) ; 2 = DGPS fix, 3 = PPS fix,
 					4 = Real Time Kinematic, 5 = Float RTK, 6 = estimated (dead reckoning), 7 = Manual input mode
@@ -105,12 +107,12 @@ private:
 
 	void GGA2Info();
 	void RMC2Info();
+	void ZDA2Info();
 
 	void ProcessGPGSA(const char *buf, const unsigned int bufSize);
 	void ProcessGPGSV(const char *buf, const unsigned int bufSize);
 	void ProcessGPRMB(const char *buf, const unsigned int bufSize);
 
-	void ProcessGPZDA(const char *buf, const unsigned int bufSize);
 
 	//bool m_logging;
 	//GPSInfo m_GPSInfo;
@@ -120,7 +122,12 @@ private:
 	int checkCrc(string *message);
 	int setNavSystem(string system);
 	void setDate(string date);
+	void setDay(string day);
+	void setMonth(string month);
+	void setYear(string year);
 	void setTime(string time);
+	void setLocalHours(string hours);
+	void setLocalMin(string min);
 	void setLatitude(string latitude);
 	void setLatHemisphere(string hem);
 	void setLongitude(string longitude);
@@ -139,6 +146,7 @@ private:
 	void setDeclination(string decl);
 	void setMagneticVariation(string magnetic_var);
 	void setFixRMC(string mode);
+
 
 	void setPDOP(string pdop);
 	void setVDOP(string vdop);

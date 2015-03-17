@@ -55,8 +55,6 @@ void NmeaParser::Parse(string *nmeaString) {
 
 		//Sentence Codes
 		string sentence_codes = nmeaArray->at(0).substr(2, 3);
-		cout << "Sentence codes : " << sentence_codes << endl;
-		cout << "Length array : " << nmeaArray->size() << endl;
 
 		if (sentence_codes == string("GGA") && nmeaArray->size() == 15) {
 
@@ -66,12 +64,10 @@ void NmeaParser::Parse(string *nmeaString) {
 
 			RMC2Info();
 
+		} else if (sentence_codes == string("ZDA")) {
+			ZDA2Info();
 		}
 		/*
-		 else if( strcmp(addressField, "GPGSA") == NULL )
-		 {
-		 ProcessGPGSA(buf, bufSize);
-		 }
 		 else if( strcmp(addressField, "GPGSV") == NULL )
 		 {
 		 ProcessGPGSV(buf, bufSize);
@@ -207,7 +203,7 @@ void NmeaParser::RMC2Info() {
 		setMagneticVariation(nmeaArray->at(11));
 
 		//if NMEA 0183 version >= 3.00
-		if(nmeaArray->size() == 13){
+		if (nmeaArray->size() == 13) {
 			//Mode indicator, (A=Autonomous, D=Differential, E=Estimated, N=Data not valid)
 			setFixRMC(nmeaArray->at(13));
 		};
@@ -217,6 +213,48 @@ void NmeaParser::RMC2Info() {
 	}
 }
 
+/*
+ Format
+ ZDA - Data and Time
+
+ $GPZDA,hhmmss.ss,dd,mm,yyyy,xx,yy*CC
+ $GPZDA,201530.00,04,07,2002,00,00*60
+
+ where:
+ hhmmss    HrMinSec(UTC)
+ dd,mm,yyy Day,Month,Year
+ xx        local zone hours -13..13
+ yy        local zone minutes 0..59
+ *CC       checksum
+ */
+
+void NmeaParser::ZDA2Info() {
+	// Time
+	setTime(nmeaArray->at(1));
+
+	//Day
+	setDay(nmeaArray->at(2));
+
+	//Month
+	setMonth(nmeaArray->at(3));
+
+	//Year
+	setYear(nmeaArray->at(4));
+
+	//Local hours
+	setLocalHours(nmeaArray->at(5));
+
+	//Local min
+	setLocalMin(nmeaArray->at(6));
+
+	cout << "ZDA: " << "time: " << nmeaINFO->utc_hour << ":" << nmeaINFO->utc_min
+			<< ":" << nmeaINFO->utc_sec << endl;
+	cout << "ZDA: " << "date: " << nmeaINFO->utc_day << ":" << nmeaINFO->utc_mon
+			<< ":"  << nmeaINFO->utc_year << endl;
+	cout << "ZDA: " << "local: " << nmeaINFO->local_zone_hours
+			<< ":"  << nmeaINFO->local_zone_min << endl;
+
+}
 void NmeaParser::ProcessGPGSA(const char *buf, const unsigned int bufSize) {
 
 }
@@ -229,9 +267,7 @@ void NmeaParser::ProcessGPRMB(const char *buf, const unsigned int bufSize) {
 
 }
 
-void NmeaParser::ProcessGPZDA(const char *buf, const unsigned int bufSize) {
 
-}
 
 /*
  * Functions settings
@@ -321,6 +357,18 @@ void NmeaParser::setDate(string date) {
 	}
 }
 
+void NmeaParser::setDay(string day) {
+	nmeaINFO->utc_day = atoi(day.c_str());
+}
+
+void NmeaParser::setMonth(string month) {
+	nmeaINFO->utc_mon = atoi(month.c_str());
+}
+
+void NmeaParser::setYear(string year) {
+	nmeaINFO->utc_year = atoi(year.c_str());
+}
+
 void NmeaParser::setTime(string time) {
 
 	if (time.size() > 6) {
@@ -328,6 +376,14 @@ void NmeaParser::setTime(string time) {
 		nmeaINFO->utc_min = atoi(time.substr(2, 2).c_str());
 		nmeaINFO->utc_sec = atoi(time.substr(4, 2).c_str());
 	}
+}
+
+void NmeaParser::setLocalHours(string hours) {
+	nmeaINFO->local_zone_hours = atoi(hours.c_str());
+}
+
+void NmeaParser::setLocalMin(string min) {
+	nmeaINFO->local_zone_min = atoi(min.c_str());
 }
 
 void NmeaParser::setLatitude(string latitude) {
@@ -366,13 +422,13 @@ void NmeaParser::setFix(string fix) {
 	nmeaINFO->fix = atoi(fix.c_str());
 }
 
-void NmeaParser::setFixRMC(string mode){
-	if(mode == string("A")){
+void NmeaParser::setFixRMC(string mode) {
+	if (mode == string("A")) {
 		nmeaINFO->fix = 1; //GPS fix (SPS)
-	} else if (mode == string("D")){
-		nmeaINFO->fix = 2;//DGPS fix
-	} else if (mode == string("E")){
-		nmeaINFO->fix = 6;//estimated (dead reckoning)
+	} else if (mode == string("D")) {
+		nmeaINFO->fix = 2; //DGPS fix
+	} else if (mode == string("E")) {
+		nmeaINFO->fix = 6; //estimated (dead reckoning)
 	} else {
 		nmeaINFO->fix = 0; //Invalid
 	};
@@ -401,18 +457,18 @@ void NmeaParser::setHeightMeter(string meter) {
 	nmeaINFO->geode_meter = meter;
 }
 
-void NmeaParser::setAgeGps(string age){
-	if(age.size() > 0){
+void NmeaParser::setAgeGps(string age) {
+	if (age.size() > 0) {
 		nmeaINFO->age_dgps = atoi(age.c_str());
 	}
 	nmeaINFO->age_dgps = 0;
 }
 
-void NmeaParser::setRefStation(string station){
-	if(station.size() > 0){
-			nmeaINFO->age_dgps = atoi(station.c_str());
-		}
-		nmeaINFO->age_dgps = 0;
+void NmeaParser::setRefStation(string station) {
+	if (station.size() > 0) {
+		nmeaINFO->age_dgps = atoi(station.c_str());
+	}
+	nmeaINFO->age_dgps = 0;
 }
 void NmeaParser::setSpeed(string speed) {
 	nmeaINFO->speed = atof(speed.c_str()) * 1.852;
@@ -426,7 +482,7 @@ void NmeaParser::setDeclination(string decl) {
 	nmeaINFO->declination = atof(decl.c_str());
 }
 
-void NmeaParser::setMagneticVariation(string magnetic_var){
+void NmeaParser::setMagneticVariation(string magnetic_var) {
 	nmeaINFO->magnetic_variation = magnetic_var;
 }
 
