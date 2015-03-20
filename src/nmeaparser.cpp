@@ -44,6 +44,8 @@ void NmeaParser::Parse(string *nmeaString) {
 
 	nmeaArray->clear();
 
+	cout << *nmeaString << endl;
+
 	gps_lrtrim(nmeaString, &gps_cfg_rtrim_chars);
 
 	if (checkCrc(nmeaString) != -1) {
@@ -65,7 +67,17 @@ void NmeaParser::Parse(string *nmeaString) {
 			RMC2Info();
 
 		} else if (sentence_codes == string("ZDA")) {
+
 			ZDA2Info();
+
+		} else if (sentence_codes == string("GSV")) {
+
+			GSV2Info();
+
+		} else if (sentence_codes == string("GLL")) {
+
+			GLL2Info();
+
 		}
 		/*
 		 else if( strcmp(addressField, "GPGSV") == NULL )
@@ -205,7 +217,7 @@ void NmeaParser::RMC2Info() {
 		//if NMEA 0183 version >= 3.00
 		if (nmeaArray->size() == 13) {
 			//Mode indicator, (A=Autonomous, D=Differential, E=Estimated, N=Data not valid)
-			setFixRMC(nmeaArray->at(13));
+			setFixRMC(nmeaArray->at(12));
 		};
 
 	} else {
@@ -247,27 +259,131 @@ void NmeaParser::ZDA2Info() {
 	//Local min
 	setLocalMin(nmeaArray->at(6));
 
-	cout << "ZDA: " << "time: " << nmeaINFO->utc_hour << ":" << nmeaINFO->utc_min
-			<< ":" << nmeaINFO->utc_sec << endl;
+	cout << "ZDA: " << "time: " << nmeaINFO->utc_hour << ":"
+			<< nmeaINFO->utc_min << ":" << nmeaINFO->utc_sec << endl;
 	cout << "ZDA: " << "date: " << nmeaINFO->utc_day << ":" << nmeaINFO->utc_mon
-			<< ":"  << nmeaINFO->utc_year << endl;
-	cout << "ZDA: " << "local: " << nmeaINFO->local_zone_hours
-			<< ":"  << nmeaINFO->local_zone_min << endl;
+			<< ":" << nmeaINFO->utc_year << endl;
+	cout << "ZDA: " << "local: " << nmeaINFO->local_zone_hours << ":"
+			<< nmeaINFO->local_zone_min << endl;
 
 }
+
+/*Format
+ GLL - Geographic Position - Latitude/Longitude
+ This is one of the sentences commonly emitted by GPS units.
+
+ 1       2 3        4 5         6 7   8
+ |       | |        | |         | |   |
+ $--GLL,llll.ll,a,yyyyy.yy,a,hhmmss.ss,a,m,*hh<CR><LF>
+ Field Number:
+
+ Latitude
+
+ N or S (North or South)
+
+ Longitude
+
+ E or W (East or West)
+
+ Universal Time Coordinated (UTC)
+
+ Status A - Data Valid, V - Data Invalid
+
+ FAA mode indicator (NMEA 2.3 and later)
+
+ Checksum
+ */
+void NmeaParser::GLL2Info() {
+
+	if (nmeaArray->at(6) == string("A")) {
+
+		//Latitude
+		setLatitude(nmeaArray->at(1));
+
+		//Latitude hemisphere
+		setLatHemisphere(nmeaArray->at(2));
+
+		//Longitude
+		setLongitude(nmeaArray->at(3));
+
+		//Longitude hemisphere
+		setLonHemisphere(nmeaArray->at(4));
+
+		//Time
+		setTime(nmeaArray->at(5));
+
+		cout << "GLL: " << "time: " << nmeaINFO->utc_hour << ":"
+				<< nmeaINFO->utc_min << ":" << nmeaINFO->utc_sec << endl;
+		cout << "GLL: " << "longitude:  " << nmeaINFO->lon_deg << ":"
+				<< nmeaINFO->lon_min << ":" << nmeaINFO->lon_sec
+				<< nmeaINFO->lon_hemisphere << endl;
+		cout << "ZDA: " << "latitude: " << nmeaINFO->lat_deg << ":"
+				<< nmeaINFO->lat_min << ":" << nmeaINFO->lat_sec
+				<< nmeaINFO->lat_hemisphere << endl;
+
+	}
+}
+
+/*
+ Format
+
+ GPS DOP and active satellites
+
+ eg1. $GPGSA,A,3,,,,,,16,18,,22,24,,,3.6,2.1,2.2*3C
+ eg2. $GPGSA,A,3,19,28,14,18,27,22,31,39,,,,,1.7,1.0,1.3*34
+
+
+ 1    = Mode:
+ M=Manual, forced to operate in 2D or 3D
+ A=Automatic, 3D/2D
+ 2    = Mode:
+ 1=Fix not available
+ 2=2D
+ 3=3D
+ 3-14 = PRN's of Satellite Vechicles (SV's) used in position fix (null for unused fields)
+ 15   = Position Dilution of Precision (PDOP)
+ 16   = Horizontal Dilution of Precision (HDOP)
+ 17   = Vertical Dilution of Precision (VDOP)
+ */
+
+void GSA2Info() {
+
+}
+/*
+ Format
+ GPS Satellites in view
+
+ eg. $GPGSV,3,1,11,03,03,111,00,04,15,270,00,06,01,010,00,13,06,292,00*74
+ $GPGSV,3,2,11,14,25,170,00,16,57,208,39,18,67,296,40,19,40,246,00*74
+ $GPGSV,3,3,11,22,42,067,42,24,14,311,43,27,05,244,00,,,,*4D
+
+
+ $GPGSV,1,1,13,02,02,213,,03,-3,000,,11,00,121,,14,13,172,05*62
+
+
+ 1    = Total number of messages of this type in this cycle
+ 2    = Message number
+ 3    = Total number of SVs in view
+ 4    = SV PRN number
+ 5    = Elevation in degrees, 90 maximum
+ 6    = Azimuth, degrees from true north, 000 to 359
+ 7    = SNR, 00-99 dB (null when not tracking)
+ 8-11 = Information about second SV, same as field 4-7
+ 12-15= Information about third SV, same as field 4-7
+ 16-19= Information about fourth SV, same as field 4-7
+
+ */
+void NmeaParser::GSV2Info() {
+
+}
+
 void NmeaParser::ProcessGPGSA(const char *buf, const unsigned int bufSize) {
-
-}
-
-void NmeaParser::ProcessGPGSV(const char *buf, const unsigned int bufSize) {
 
 }
 
 void NmeaParser::ProcessGPRMB(const char *buf, const unsigned int bufSize) {
 
 }
-
-
 
 /*
  * Functions settings
