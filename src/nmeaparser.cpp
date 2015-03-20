@@ -20,6 +20,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <vector>
+#include <algorithm>
 #include <math.h>
 #include <typeinfo>
 
@@ -388,7 +389,7 @@ void NmeaParser::ProcessGPRMB(const char *buf, const unsigned int bufSize) {
 /*
  * Functions settings
  */
-string itoa(int value, int base) {
+string itoa_custom(int value, int base) {
 
 	string buf;
 
@@ -413,7 +414,7 @@ string itoa(int value, int base) {
 	if (value < 0)
 		buf += '-';
 
-	reverse(buf.begin(), buf.end());
+	std::reverse(buf.begin(), buf.end());
 	return buf;
 }
 
@@ -434,7 +435,7 @@ int NmeaParser::checkCrc(string *message) {
 	string crc = message->substr(i + 1, i + 2);
 	transform(crc.begin(), crc.end(), crc.begin(), ::tolower);
 
-	if (crc != itoa(calc_crc, 16)) {
+	if (crc != itoa_custom(calc_crc, 16)) {
 		return -1;
 	}
 
